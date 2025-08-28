@@ -1,11 +1,11 @@
 export default function handler(req, res) {
-  if (req.method === "GET") {
-    // Gupshup verification er jonne GET request e ekdom simple response dite hobe
-    res.status(200).json({ success: true, message: "Webhook is live" });
-  } else if (req.method === "POST") {
-    console.log("Incoming Gupshup payload:", req.body);
-    res.status(200).json({ success: true });
+  if (req.method === "POST") {
+    console.log("Webhook received:", req.body);
+
+    // Gupshup ke always 200 dite hobe, nahole invalid bole
+    res.status(200).json({ success: true, message: "Webhook received" });
   } else {
-    res.status(405).json({ error: "Method not allowed" });
+    // Browser diye test korle GET request e eta dekhabe
+    res.status(200).json({ message: "Webhook is working" });
   }
 }
