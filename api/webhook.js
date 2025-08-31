@@ -1,40 +1,25 @@
-export default async function handler(req, res) {  try {
+export default async function handler(req, res) {
+  try {
     if (req.method === "POST") {
       console.log("Incoming Webhook Body:", req.body);
       const incoming = req.body;
-      const userMessage = incoming.payload?.payload?.text || "Hi";
-      const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: "You are Babooda, a helpful teaching chatbot." },
-            { role: "user", content: userMessage }
-          ],
-        }),
-      });
+      const reply = "Hello! Babooda test reply working ✅";
 
-      const data = await openAiResponse.json();
-      const botReply = data.choices?.[0]?.message?.content || "Sorry, I couldn’t process that.";
       await fetch("https://api.gupshup.io/wa/api/v1/msg", {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
-          apikey: process.env.GUPSHUP_API_KEY, 
+          apikey: process.env.GUPSHUP_API_KEY,
         },
         body: new URLSearchParams({
           channel: "whatsapp",
           source: process.env.WHATSAPP_NUMBER,
-          destination: incoming.payload.sender?.phone || "",
-          message: botReply,
+          destination: incoming.payload?.sender?.phone || "",
+          message: reply,
         }),
       });
 
-      res.status(200).json({ success: true, reply: botReply });
+      res.status(200).json({ success: true, reply });
     } else {
       res.status(200).send("Webhook running OK (GET)");
     }
