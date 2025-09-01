@@ -40,17 +40,19 @@ export default async function handler(req, res) {
         "Sorry, I couldn’t process that. Try again.";
 
       // Send reply back to WhatsApp user
-      await fetch("https://api.gupshup.io/wa/api/v1/msg", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          apikey: process.env.GUPSHUP_API_KEY,
-        },
-        body: new URLSearchParams({
-          channel: "whatsapp",
-          source: process.env.WHATSAPP_NUMBER,
-          destination: incoming.payload?.sender?.phone || incoming.payload?.destination || "918910963930",
-          message: botReply,
+      await fetch("https://api.gupshup.io/sm/api/v1/msg", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/x-www-form-urlencoded",
+    apikey: process.env.GUPSHUP_API_KEY, 
+  },
+  body: new URLSearchParams({
+    channel: "whatsapp",
+    source: "917834811114",   // Sandbox number
+    destination: incoming.payload.sender?.phone || "918910963930",
+    message: botReply,
+  }),
+});
         }),
       });
 
