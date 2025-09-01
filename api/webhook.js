@@ -53,10 +53,7 @@ export default async function handler(req, res) {
     message: botReply,
   }),
 });
-        }),
-      });
-
-      res.status(200).json({ success: true, reply: botReply });
+ res.status(200).json({ success: true, reply: botReply });
     } else {
       res.status(200).send("Webhook running OK (GET)");
     }
