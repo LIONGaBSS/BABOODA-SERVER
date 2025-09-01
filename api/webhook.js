@@ -49,7 +49,7 @@ export default async function handler(req, res) {
         body: new URLSearchParams({
           channel: "whatsapp",
           source: process.env.WHATSAPP_NUMBER,
-          destination: incoming.payload?.sender?.phone || "",
+          destination: incoming.payload?.sender?.phone || incoming.payload?.destination || "918910963930",
           message: botReply,
         }),
       });
