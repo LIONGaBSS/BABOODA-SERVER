@@ -49,7 +49,7 @@ export default async function handler(req, res) {
   body: new URLSearchParams({
     channel: "whatsapp",
     source: "917834811114",   // Sandbox number
-    destination: incoming.payload.sender?.phone || "918910963930",
+    destination: incoming.payload.sender?.phone,
     message: botReply,
   }),
 });
