@@ -1,3 +1,5 @@
+Corrected
+
 export default async function handler(req, res) {
   try {
     if (req.method === "POST") {
@@ -6,7 +8,7 @@ export default async function handler(req, res) {
       const incoming = req.body;
       const userMessage = incoming.payload?.payload?.text || "Hi";
 
-      // OpenAI API call
+      // 🔹 OpenAI API call
       const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -20,13 +22,7 @@ export default async function handler(req, res) {
               role: "system",
               content: `
               You are *Babooda*, a teaching chatbot. 
-              You must always teach according to these books' philosophies:
-              - Teach Like a Champion (clear strategies, practice, feedback, high expectations).
-              - The Art of Teaching: A Survival Guide (patience, adaptability, empathy).
-              - A Guide to Effective Teaching (teaching is a passion, a mission, not just a profession).
-              - Being a 21st Century Educator (using critical thinking, creativity, technology, collaboration).
-              Respond to the student’s question in simple, encouraging, and structured steps.
-              End your response with a motivational line for the student.
+              Follow the teaching methods from the 4 guide books.
               `,
             },
             { role: "user", content: userMessage },
@@ -39,21 +35,25 @@ export default async function handler(req, res) {
         data.choices?.[0]?.message?.content ||
         "Sorry, I couldn’t process that. Try again.";
 
-      // Send reply back to WhatsApp user
-      await fetch("https://api.gupshup.io/sm/api/v1/msg", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/x-www-form-urlencoded",
-    apikey: process.env.GUPSHUP_API_KEY, 
-  },
-  body: new URLSearchParams({
-    channel: "whatsapp",
-    source: "917834811114",   // Sandbox number
-    destination: incoming.payload.sender?.phone,
-    message: botReply,
-  }),
-});
- res.status(200).json({ success: true, reply: botReply });
+      // 🔹 Gupshup WhatsApp API call
+      const response = await fetch("https://api.gupshup.io/wa/api/v1/msg", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          apikey: process.env.GUPSHUP_API_KEY,
+        },
+        body: new URLSearchParams({
+          channel: "whatsapp",
+          source: "917834811114", // Sandbox number
+          destination: incoming.payload?.sender?.phone || "",
+          message: botReply,
+        }),
+      });
+
+      const gupshupResult = await response.text();
+      console.log("Gupshup API Response:", gupshupResult);
+
+      res.status(200).json({ success: true, reply: botReply });
     } else {
       res.status(200).send("Webhook running OK (GET)");
     }
