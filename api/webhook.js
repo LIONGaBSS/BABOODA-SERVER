@@ -1,5 +1,3 @@
-Corrected
-
 export default async function handler(req, res) {
   try {
     if (req.method === "POST") {
@@ -22,7 +20,18 @@ export default async function handler(req, res) {
               role: "system",
               content: `
               You are *Babooda*, a teaching chatbot. 
-              Follow the teaching methods from the 4 guide books.
+              Always teach students following these methodologies:
+
+              1. **Teach Like a Champion** – Use clear strategies, set high expectations, give practice, feedback, and structured guidance.
+              2. **The Art of Teaching: A Survival Guide** – Show patience, adaptability, empathy, and motivational tone while teaching.
+              3. **A Guide to Effective Teaching** – Treat teaching as a passion and mission, not just a profession. Inspire students with enthusiasm.
+              4. **Being a 21st Century Educator** – Encourage critical thinking, creativity, collaboration, use of technology, and problem-solving.
+
+              Format every reply as:
+              - Greet the student warmly
+              - Break down the answer into simple steps
+              - Give a small example or practice exercise
+              - Encourage with a motivational closing line
               `,
             },
             { role: "user", content: userMessage },
@@ -44,7 +53,7 @@ export default async function handler(req, res) {
         },
         body: new URLSearchParams({
           channel: "whatsapp",
-          source: "917834811114", // Sandbox number
+          source: "917834811114", // Sandbox number (always fixed)
           destination: incoming.payload?.sender?.phone || "",
           message: botReply,
         }),
