@@ -6,7 +6,7 @@ export default async function handler(req, res) {
       const incoming = req.body;
       const userMessage = incoming.payload?.payload?.text || "Hi";
 
-      sole.log("📩 User Message:", userMessage);
+      console.log("📩 User Message:", userMessage);
       console.log("📱 Sender:", incoming.payload?.sender?.phone);
       const botReply = `Hello! I got your message: "${userMessage}" ✅`;
 
