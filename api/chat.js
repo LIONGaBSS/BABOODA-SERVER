@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo",
+        model: "gpt-3.5-turbo-0125", // ✅ safer model version
         messages: [
           {
             role: "system",
@@ -39,10 +39,12 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
+    console.log("OpenAI raw response:", data); // ✅ Debugging log
 
-    const reply =
-      data.choices?.[0]?.message?.content ||
-      "Sorry, I couldn’t generate a reply.";
+    let reply = "Sorry, I couldn’t generate a reply.";
+    if (data.choices && data.choices.length > 0) {
+      reply = data.choices[0].message.content;
+    }
 
     res.status(200).json({ reply });
   } catch (err) {
