@@ -1,4 +1,13 @@
 export default async function handler(req, res) {
+  // ✅ Add CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Only POST allowed" });
   }
@@ -18,7 +27,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo-0125", // ✅ safer model version
+        model: "gpt-3.5-turbo-0125",
         messages: [
           {
             role: "system",
@@ -39,7 +48,7 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    console.log("OpenAI raw response:", data); // ✅ Debugging log
+    console.log("OpenAI raw response:", data);
 
     let reply = "Sorry, I couldn’t generate a reply.";
     if (data.choices && data.choices.length > 0) {
