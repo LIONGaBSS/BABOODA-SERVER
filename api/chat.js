@@ -51,10 +51,12 @@ export default async function handler(req, res) {
     console.log("OpenAI raw response:", data);
 
     let reply = "Sorry, I couldn’t generate a reply.";
-    if (data.choices && data.choices.length > 0) {
-      reply = data.choices[0].message.content;
-    }
-
+if (data.choices && data.choices.length > 0) {
+  if (data.choices[0].message && data.choices[0].message.content) {
+    reply = data.choices[0].message.content;
+  } else if (data.choices[0].text) {
+    reply = data.choices[0].text;
+  }
     res.status(200).json({ reply });
   } catch (err) {
     console.error("Error in /api/chat:", err);
