@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Babooda Learning AI</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <h1>Babooda</h1>
+        <p>Syllabus-grounded AI learning platform</p>
+      </div>
+      <div id="authStatus" class="status-pill">Not logged in</div>
+    </header>
+
+    <main class="grid">
+      <section class="card auth-card">
+        <h2>Login / Register</h2>
+
+        <div class="tabs">
+          <button class="tab active" data-tab="login">Login</button>
+          <button class="tab" data-tab="register">Register</button>
+        </div>
+
+        <form id="loginForm" class="panel active">
+          <input type="email" id="loginEmail" placeholder="Email" required />
+          <input type="password" id="loginPassword" placeholder="Password" required />
+          <button type="submit">Login</button>
+        </form>
+
+        <form id="registerForm" class="panel">
+          <input type="text" id="regName" placeholder="Name" required />
+          <input type="email" id="regEmail" placeholder="Email" required />
+          <input type="password" id="regPassword" placeholder="Password" required />
+          <select id="regRole">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+          <button type="submit">Register</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>User Profile</h2>
+        <div class="profile-grid">
+          <input id="pName" placeholder="Name" />
+          <input id="pAge" placeholder="Age" />
+          <input id="pClassLevel" placeholder="Class level" />
+          <input id="pBoard" placeholder="Board" />
+          <input id="pSubjectLevel" placeholder="Subject level" />
+          <input id="pLanguage" placeholder="Language" />
+          <input id="pReadingLevel" placeholder="Reading level" />
+          <input id="pLearningGoal" placeholder="Learning goal" />
+          <input id="pWeakTopics" placeholder="Weak topics" />
+          <input id="pPreferredTone" placeholder="Preferred tone" />
+          <textarea id="pDepthNotes" placeholder="Depth notes"></textarea>
+        </div>
+        <button id="saveProfileBtn">Save Profile</button>
+      </section>
+
+      <section class="card">
+        <h2>Ask AI from the syllabus</h2>
+
+        <div class="row">
+          <select id="classSelect"></select>
+          <select id="topicSelect"></select>
+        </div>
+
+        <div class="row">
+          <select id="modeSelect">
+            <option value="general">General question</option>
+            <option value="aim">Aim of topic</option>
+            <option value="main_idea">Main trunk / load-bearing idea</option>
+            <option value="counter">Counter arguments / interpretations</option>
+            <option value="analogy">Practical analogy</option>
+            <option value="application">How to use this idea</option>
+          </select>
+        </div>
+
+        <textarea id="questionInput" placeholder="Type your question..."></textarea>
+        <button id="askBtn">Ask AI</button>
+
+        <div id="answerBox" class="answer-box"></div>
+      </section>
+
+      <section class="card admin-card">
+        <h2>Admin tools</h2>
+
+        <div class="admin-grid">
+          <div>
+            <h3>Create / update user</h3>
+            <input id="adminUserId" placeholder="User ID to update (optional)" />
+            <input id="adminName" placeholder="Name" />
+            <input id="adminEmail" placeholder="Email" />
+            <input id="adminPassword" placeholder="Password" />
+            <select id="adminRole">
+              <option value="user">User</option>
+              <option value="admin">Admin</option>
+            </select>
+            <input id="adminAge" placeholder="Age" />
+            <input id="adminClassLevel" placeholder="Class level" />
+            <input id="adminBoard" placeholder="Board" />
+            <input id="adminSubjectLevel" placeholder="Subject level" />
+            <input id="adminLanguage" placeholder="Language" />
+            <input id="adminReadingLevel" placeholder="Reading level" />
+            <input id="adminLearningGoal" placeholder="Learning goal" />
+            <input id="adminWeakTopics" placeholder="Weak topics" />
+            <input id="adminPreferredTone" placeholder="Preferred tone" />
+            <textarea id="adminDepthNotes" placeholder="Depth notes"></textarea>
+            <button id="saveAdminUserBtn">Save User</button>
+          </div>
+
+          <div>
+            <h3>Bloom assessment</h3>
+            <input id="bloomUserId" placeholder="User ID (optional)" />
+            <button id="loadUsersBtn">Load users</button>
+            <div id="userList" class="list-box"></div>
+
+            <button id="generateBloomBtn">Generate Bloom Questions</button>
+            <div id="bloomBox" class="answer-box"></div>
+
+            <h3>Grade one answer</h3>
+            <textarea id="gradeQuestion" placeholder="Question"></textarea>
+            <textarea id="gradeAnswer" placeholder="Student answer"></textarea>
+            <input id="gradeTopicId" placeholder="Topic ID" />
+            <button id="gradeBtn">Grade Answer</button>
+            <div id="gradeBox" class="answer-box"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Syllabus topics</h2>
+        <div class="row">
+          <button id="reloadTopicsBtn">Reload topics</button>
+          <button id="loadAssessmentsBtn">Load assessments</button>
+        </div>
+        <div id="topicList" class="list-box"></div>
+        <div id="assessmentList" class="list-box"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
