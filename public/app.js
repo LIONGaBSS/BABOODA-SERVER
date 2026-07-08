@@ -1,10 +1,13 @@
+const API_BASE = "";
+
 const state = {
   token: localStorage.getItem("babooda_token") || "",
   me: null,
   classes: [],
   topics: [],
-  users: [],
-  assessments: []
+  broadcasts: [],
+  evaluations: [],
+  role: ""
 };
 
 function $(id) {
@@ -16,349 +19,156 @@ async function api(path, options = {}) {
   headers["Content-Type"] = "application/json";
   if (state.token) headers["Authorization"] = `Bearer ${state.token}`;
 
-  const res = await fetch(path, {
-    ...options,
-    headers
-  });
-
+  const res = await fetch(API_BASE + path, { ...options, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
 }
 
+function show(id, on) {
+  $(id).classList.toggle("hidden", !on);
+}
+
+function renderProfile() {
+  if (!state.me) return;
+  $("profileBox").textContent = JSON.stringify(state.me, null, 2);
+}
+
 function setStatus(text) {
-  $("authStatus").textContent = text;
+  $("statusPill").textContent = text;
 }
 
-function showAnswer(targetId, data) {
-  $(targetId).textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
+function renderRoleCards() {
+  show("profileCard", !!state.me);
+  show("syllabusCard", !!state.me);
+  show("adminCard", state.me?.role === "admin");
+  show("userCard", state.me?.role === "user");
+  show("organizerCard", state.me?.role === "organizer");
 }
 
-function renderTabs() {
-  document.querySelectorAll(".tab").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((x) => x.classList.remove("active"));
-      document.querySelectorAll(".panel").forEach((x) => x.classList.remove("active"));
-      btn.classList.add("active");
-      document.querySelector(`#${btn.dataset.tab}Form`).classList.add("active");
-    });
-  });
+function fillSelect(el, items, mapFn) {
+  el.innerHTML = "";
+  for (const item of items) {
+    const o = document.createElement("option");
+    const mapped = mapFn(item);
+    o.value = mapped.value;
+    o.textContent = mapped.label;
+    el.appendChild(o);
+  }
 }
 
-function fillProfile(user) {
-  if (!user) return;
-  $("pName").value = user.name || "";
-  $("pAge").value = user.age || "";
-  $("pClassLevel").value = user.classLevel || "";
-  $("pBoard").value = user.board || "";
-  $("pSubjectLevel").value = user.subjectLevel || "";
-  $("pLanguage").value = user.language || "";
-  $("pReadingLevel").value = user.readingLevel || "";
-  $("pLearningGoal").value = user.learningGoal || "";
-  $("pWeakTopics").value = user.weakTopics || "";
-  $("pPreferredTone").value = user.preferredTone || "";
-  $("pDepthNotes").value = user.depthNotes || "";
-
-  $("adminName").value = user.name || "";
-  $("adminEmail").value = user.email || "";
-  $("adminRole").value = user.role || "user";
-  $("adminAge").value = user.age || "";
-  $("adminClassLevel").value = user.classLevel || "";
-  $("adminBoard").value = user.board || "";
-  $("adminSubjectLevel").value = user.subjectLevel || "";
-  $("adminLanguage").value = user.language || "";
-  $("adminReadingLevel").value = user.readingLevel || "";
-  $("adminLearningGoal").value = user.learningGoal || "";
-  $("adminWeakTopics").value = user.weakTopics || "";
-  $("adminPreferredTone").value = user.preferredTone || "";
-  $("adminDepthNotes").value = user.depthNotes || "";
-
-  $("gradeTopicId").value = state.topics[0]?.id || "";
-}
-
-function option(text, value) {
-  const el = document.createElement("option");
-  el.textContent = text;
-  el.value = value;
-  return el;
-}
-
-async function loadClassesAndTopics() {
-  const classRes = await api("/api/syllabus/classes");
-  state.classes = classRes.classes || [];
-
-  $("classSelect").innerHTML = "";
-  $("classSelect").appendChild(option("All classes", ""));
-  state.classes.forEach((c) => $("classSelect").appendChild(option(`Class ${c}`, c)));
-
-  await loadTopics();
+async function loadClasses() {
+  const res = await api("/api/syllabus/classes");
+  state.classes = res.classes || [];
+  fillSelect($("classSelect"), state.classes, (c) => ({
+    value: c,
+    label: `Class ${c}`
+  }));
+  fillSelect($("adminClassSelect"), state.classes, (c) => ({
+    value: c,
+    label: `Class ${c}`
+  }));
 }
 
 async function loadTopics() {
-  const classNo = $("classSelect").value;
-  const q = $("questionInput").value.trim();
-  const params = new URLSearchParams();
-  if (classNo) params.set("class", classNo);
-  if (q) params.set("q", q);
-
-  const res = await api(`/api/syllabus/topics?${params.toString()}`);
+  const classNo = $("classSelect").value || "";
+  const q = $("topicSearch").value || "";
+  const res = await api(`/api/syllabus/topics?classNo=${encodeURIComponent(classNo)}&q=${encodeURIComponent(q)}`);
   state.topics = res.topics || [];
+  renderTopics();
 
-  $("topicSelect").innerHTML = "";
-  state.topics.forEach((t) => {
-    const label = `Class ${t.classNo} | ${t.title}`;
-    $("topicSelect").appendChild(option(label, t.id));
-  });
+  fillSelect($("adminTopicSelect"), state.topics, (t) => ({
+    value: t.id,
+    label: `Class ${t.classNo} | ${t.title}`
+  }));
 
-  renderTopicList();
-  if (state.topics.length) $("gradeTopicId").value = state.topics[0].id;
+  fillSelect($("userTopicSelect"), state.topics, (t) => ({
+    value: t.id,
+    label: `Class ${t.classNo} | ${t.title}`
+  }));
+
+  fillSelect($("evalBroadcastSelect"), state.broadcasts, (b) => ({
+    value: b.id,
+    label: `${b.title} | Class ${b.classNo}`
+  }));
 }
 
-function renderTopicList() {
-  const box = $("topicList");
-  if (!state.topics.length) {
-    box.textContent = "No topics found.";
-    return;
-  }
-  box.innerHTML = state.topics
-    .map(
-      (t) => `
-      <div style="padding:10px;border-bottom:1px solid #e6edf5">
-        <b>${t.title}</b><br/>
-        Class: ${t.classNo} | Subject: ${t.subject}<br/>
-        Topic ID: ${t.id}<br/>
-        Aim: ${t.aim || "-"}<br/>
-        ${t.content ? t.content.slice(0, 180) : ""}
-      </div>
-    `
-    )
-    .join("");
+function renderTopics() {
+  $("topicList").textContent = state.topics.length
+    ? state.topics
+        .map(
+          (t) =>
+            `Topic ID: ${t.id}\nClass: ${t.classNo}\nSubject: ${t.subject}\nTitle: ${t.title}\nAim: ${t.aim || "-"}\nContent: ${t.content.slice(0, 220)}\n`
+        )
+        .join("\n---\n")
+    : "No topics found.";
 }
 
-async function refreshMe() {
-  if (!state.token) {
-    state.me = null;
-    setStatus("Not logged in");
-    return;
-  }
-
-  const res = await api("/api/me");
+async function loadMe() {
+  if (!state.token) return;
+  const res = await api("/api/auth/me");
   state.me = res.user;
-  setStatus(`Logged in as ${state.me.name} (${state.me.role})`);
-  fillProfile(state.me);
-  renderRoleUI();
+  state.role = state.me.role;
+  setStatus(`Logged in as ${state.me.role}: ${state.me.name}`);
+  renderProfile();
+  renderRoleCards();
 }
 
-function renderRoleUI() {
-  const isAdmin = state.me?.role === "admin";
-  document.querySelector(".admin-card").style.display = isAdmin ? "block" : "none";
-}
-
-async function login(email, password) {
-  const res = await api("/api/login", {
+async function login(role, organizationId, password) {
+  const res = await api("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ role, organizationId, password })
   });
   state.token = res.token;
   localStorage.setItem("babooda_token", state.token);
-  await refreshMe();
+  state.me = res.user;
+  state.role = res.user.role;
+  setStatus(`Logged in as ${res.user.role}: ${res.user.name}`);
+  renderProfile();
+  renderRoleCards();
+  await refreshDashboards();
 }
 
 async function register(payload) {
-  const res = await api("/api/register", {
+  const res = await api("/api/auth/register", {
     method: "POST",
     body: JSON.stringify(payload)
   });
   state.token = res.token;
   localStorage.setItem("babooda_token", state.token);
-  await refreshMe();
-}
-
-async function saveProfile() {
-  const payload = {
-    name: $("pName").value,
-    age: $("pAge").value,
-    classLevel: $("pClassLevel").value,
-    board: $("pBoard").value,
-    subjectLevel: $("pSubjectLevel").value,
-    language: $("pLanguage").value,
-    readingLevel: $("pReadingLevel").value,
-    learningGoal: $("pLearningGoal").value,
-    weakTopics: $("pWeakTopics").value,
-    preferredTone: $("pPreferredTone").value,
-    depthNotes: $("pDepthNotes").value
-  };
-
-  const res = await api("/api/me", {
-    method: "PUT",
-    body: JSON.stringify(payload)
-  });
-
   state.me = res.user;
-  fillProfile(state.me);
-  setStatus(`Profile saved for ${state.me.name}`);
+  state.role = res.user.role;
+  setStatus(`Registered: ${res.user.name}`);
+  renderProfile();
+  renderRoleCards();
+  await refreshDashboards();
 }
 
-async function askAI() {
-  const question = $("questionInput").value.trim();
-  const topicId = $("topicSelect").value;
-  const classNo = $("classSelect").value;
-  const mode = $("modeSelect").value;
+async function refreshDashboards() {
+  await loadClasses();
+  await loadTopics();
 
-  if (!question) {
-    $("answerBox").textContent = "Please type a question.";
-    return;
+  if (state.me?.role === "admin") {
+    const bro = await api("/api/admin/broadcasts");
+    state.broadcasts = bro.broadcasts || [];
+    fillSelect($("evalBroadcastSelect"), state.broadcasts, (b) => ({
+      value: b.id,
+      label: `${b.title} | Class ${b.classNo}`
+    }));
   }
 
-  const res = await api("/api/ask", {
-    method: "POST",
-    body: JSON.stringify({ question, topicId, classNo, mode })
-  });
-
-  showAnswer(
-    "answerBox",
-    {
-      topic: {
-        id: res.topic.id,
-        title: res.topic.title,
-        classNo: res.topic.classNo,
-        aim: res.topic.aim
-      },
-      answer: res.answer
-    }
-  );
-}
-
-async function saveAdminUser() {
-  const userId = $("adminUserId").value.trim();
-  const payload = {
-    name: $("adminName").value,
-    email: $("adminEmail").value,
-    password: $("adminPassword").value,
-    role: $("adminRole").value,
-    age: $("adminAge").value,
-    classLevel: $("adminClassLevel").value,
-    board: $("adminBoard").value,
-    subjectLevel: $("adminSubjectLevel").value,
-    language: $("adminLanguage").value,
-    readingLevel: $("adminReadingLevel").value,
-    learningGoal: $("adminLearningGoal").value,
-    weakTopics: $("adminWeakTopics").value,
-    preferredTone: $("adminPreferredTone").value,
-    depthNotes: $("adminDepthNotes").value
-  };
-
-  let res;
-  if (userId) {
-    res = await api(`/api/admin/users/${userId}`, {
-      method: "PUT",
-      body: JSON.stringify(payload)
-    });
-  } else {
-    res = await api("/api/admin/users", {
-      method: "POST",
-      body: JSON.stringify(payload)
-    });
+  if (state.me?.role === "user") {
+    const feed = await api("/api/user/feed");
+    state.broadcasts = feed.broadcasts || [];
+    state.evaluations = feed.evaluations || [];
   }
-
-  showAnswer("gradeBox", res.user);
-  await loadUsers();
 }
 
-async function loadUsers() {
-  const res = await api("/api/admin/users");
-  state.users = res.users || [];
-
-  const box = $("userList");
-  if (!state.users.length) {
-    box.textContent = "No users.";
-    return;
-  }
-
-  box.innerHTML = state.users
-    .map(
-      (u) => `
-        <div style="padding:10px;border-bottom:1px solid #e6edf5">
-          <b>${u.name}</b> (${u.role})<br/>
-          Email: ${u.email}<br/>
-          ID: ${u.id}<br/>
-          Class: ${u.classLevel || "-"} | Age: ${u.age || "-"} | Bloom: ${u.bloomLevel || "-"} (${u.bloomScore || 0})
-        </div>
-      `
-    )
-    .join("");
-}
-
-async function generateBloom() {
-  const topicId = $("topicSelect").value || $("gradeTopicId").value.trim();
-  const userId = $("bloomUserId").value.trim();
-
-  if (!topicId) {
-    $("bloomBox").textContent = "Select a topic first.";
-    return;
-  }
-
-  const res = await api("/api/admin/generate-bloom", {
-    method: "POST",
-    body: JSON.stringify({ topicId, userId: userId || null })
-  });
-
-  showAnswer("bloomBox", res.assessment);
-  await loadAssessments();
-}
-
-async function gradeOneAnswer() {
-  const question = $("gradeQuestion").value.trim();
-  const answer = $("gradeAnswer").value.trim();
-  const topicId = $("gradeTopicId").value.trim();
-  const userId = $("bloomUserId").value.trim();
-
-  const res = await api("/api/admin/grade-answer", {
-    method: "POST",
-    body: JSON.stringify({
-      question,
-      answer,
-      topicId,
-      userId: userId || null
-    })
-  });
-
-  showAnswer("gradeBox", res);
-  await refreshMe();
-}
-
-async function loadAssessments() {
-  const res = await api("/api/admin/assessments");
-  state.assessments = res.assessments || [];
-
-  const box = $("assessmentList");
-  if (!state.assessments.length) {
-    box.textContent = "No assessments yet.";
-    return;
-  }
-
-  box.innerHTML = state.assessments
-    .map(
-      (a) => `
-        <div style="padding:10px;border-bottom:1px solid #e6edf5">
-          <b>${a.topicTitle || "Assessment"}</b><br/>
-          User ID: ${a.userId}<br/>
-          Assessment ID: ${a.id}<br/>
-          Questions: ${(a.questions || []).length}<br/>
-          Created: ${a.createdAt}
-        </div>
-      `
-    )
-    .join("");
-}
-
-async function wireUp() {
-  renderTabs();
-
+function loginUI() {
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     try {
-      await login($("loginEmail").value, $("loginPassword").value);
+      await login($("loginRole").value, $("loginId").value, $("loginPassword").value);
     } catch (err) {
       alert(err.message);
     }
@@ -368,107 +178,207 @@ async function wireUp() {
     e.preventDefault();
     try {
       await register({
+        role: $("regRole").value,
+        organizationId: $("regId").value,
         name: $("regName").value,
-        email: $("regEmail").value,
         password: $("regPassword").value,
-        role: $("regRole").value
+        age: $("regAge").value,
+        classNo: $("regClassNo").value,
+        subject: $("regSubject").value,
+        designation: $("regDesignation").value,
+        discipline: $("regDiscipline").value,
+        school: $("regSchool").value,
+        department: $("regDepartment").value,
+        address: $("regAddress").value,
+        phone: $("regPhone").value,
+        email: $("regEmail").value
       });
     } catch (err) {
       alert(err.message);
     }
   });
+}
+
+async function saveProfile() {
+  const res = await api("/api/auth/me", {
+    method: "PUT",
+    body: JSON.stringify({
+      name: state.me.name,
+      age: state.me.profile?.age || "",
+      classNo: state.me.profile?.classNo || "",
+      subject: state.me.profile?.subject || "",
+      designation: state.me.profile?.designation || "",
+      discipline: state.me.profile?.discipline || "",
+      school: state.me.profile?.school || "",
+      department: state.me.profile?.department || "",
+      address: state.me.profile?.address || "",
+      phone: state.me.profile?.phone || "",
+      email: state.me.profile?.email || ""
+    })
+  });
+  state.me = res.user;
+  renderProfile();
+}
+
+function adminUI() {
+  $("aimBtn").addEventListener("click", async () => {
+    const topicId = $("adminTopicSelect").value;
+    const classNo = $("adminClassSelect").value;
+    const question = $("adminQuestion").value || "What is the aim of this topic?";
+    const res = await api("/api/admin/aim", {
+      method: "POST",
+      body: JSON.stringify({ topicId, classNo, question })
+    });
+    $("adminAIBox").value = JSON.stringify(res.answer, null, 2);
+  });
+
+  $("broadcastBtn").addEventListener("click", async () => {
+    const topicId = $("adminTopicSelect").value;
+    const topic = state.topics.find((t) => t.id === topicId);
+    const payload = {
+      topicId,
+      classNo: topic.classNo,
+      subject: topic.subject,
+      title: topic.title,
+      adminId: state.me.id,
+      aiAnswer: $("adminAIBox").value,
+      editedAnswer: $("adminAIBox").value
+    };
+    const res = await api("/api/admin/broadcast", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    alert(`Broadcasted: ${res.broadcast.title}`);
+    await refreshDashboards();
+  });
+
+  $("loadRemindersBtn").addEventListener("click", async () => {
+    const res = await api("/api/admin/reminders");
+    $("reminderBox").textContent = JSON.stringify(res.reminders, null, 2);
+  });
+
+  $("loadUsersBtn").addEventListener("click", async () => {
+    const classNo = $("adminClassSelect").value;
+    const res = await api(`/api/admin/users?classNo=${encodeURIComponent(classNo)}&role=user`);
+    $("adminUserBox").textContent = JSON.stringify(res.users, null, 2);
+  });
+
+  $("genEvalBtn").addEventListener("click", async () => {
+    const broadcastId = $("evalBroadcastSelect").value;
+    const res = await api("/api/admin/generate-evaluation", {
+      method: "POST",
+      body: JSON.stringify({ broadcastId })
+    });
+    $("evalBox").textContent = JSON.stringify(res.evaluation, null, 2);
+  });
+
+  $("loadReportBtn").addEventListener("click", async () => {
+    const year = $("reportYear").value || new Date().getFullYear();
+    const res = await api(`/api/admin/report/${encodeURIComponent(year)}`);
+    $("reportBox").textContent = JSON.stringify(res, null, 2);
+  });
+}
+
+function userUI() {
+  $("loadFeedBtn").addEventListener("click", async () => {
+    const res = await api("/api/user/feed");
+    $("feedBox").textContent = JSON.stringify(res, null, 2);
+    fillSelect($("userTopicSelect"), res.broadcasts || [], (b) => ({
+      value: b.topicId,
+      label: `${b.title} | Class ${b.classNo}`
+    }));
+  });
+
+  $("loadEvaluationsBtn").addEventListener("click", async () => {
+    const res = await api("/api/user/evaluations");
+    $("evalFeedBox").textContent = JSON.stringify(res.evaluations, null, 2);
+  });
+
+  document.querySelectorAll(".modeBtn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const mode = btn.dataset.mode;
+      const topicId = $("userTopicSelect").value;
+      const question = $("userQuestion").value;
+      const res = await api("/api/user/ask", {
+        method: "POST",
+        body: JSON.stringify({ topicId, question, mode })
+      });
+      $("userAnswerBox").textContent = JSON.stringify(res.answer, null, 2);
+    });
+  });
+}
+
+function organizerUI() {
+  $("loadDashboardBtn").addEventListener("click", async () => {
+    const res = await api("/api/organizer/dashboard");
+    $("adminListBox").textContent = JSON.stringify(res.admins, null, 2);
+    $("userListBox").textContent = JSON.stringify(res.users, null, 2);
+  });
+
+  $("loadDeregBtn").addEventListener("click", async () => {
+    const res = await api("/api/organizer/deregister-requests");
+    $("deregBox").textContent = JSON.stringify(res.requests, null, 2);
+  });
+
+  $("deregRequestBtn").addEventListener("click", async () => {
+    const res = await api("/api/organizer/deregister/request", {
+      method: "POST",
+      body: JSON.stringify({
+        targetUserId: $("deregTargetId").value,
+        reason: $("deregReason").value
+      })
+    });
+    $("deregBox").textContent = JSON.stringify(res.request, null, 2);
+  });
+
+  $("approveBtn").addEventListener("click", async () => {
+    const res = await api("/api/organizer/deregister/approve", {
+      method: "POST",
+      body: JSON.stringify({ requestId: $("approveRequestId").value })
+    });
+    $("deregBox").textContent = JSON.stringify(res.request, null, 2);
+  });
+}
+
+function wireSearch() {
+  $("classSelect").addEventListener("change", loadTopics);
+  $("topicSearch").addEventListener("input", () => {
+    clearTimeout(window.__topicTimer);
+    window.__topicTimer = setTimeout(loadTopics, 300);
+  });
+}
+
+async function init() {
+  loginUI();
+  wireSearch();
 
   $("saveProfileBtn").addEventListener("click", async () => {
     try {
       await saveProfile();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("askBtn").addEventListener("click", async () => {
-    try {
-      await askAI();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("classSelect").addEventListener("change", loadTopics);
-  $("questionInput").addEventListener("input", () => {
-    clearTimeout(window.__topicTimer);
-    window.__topicTimer = setTimeout(loadTopics, 350);
-  });
-
-  $("saveAdminUserBtn").addEventListener("click", async () => {
-    try {
-      await saveAdminUser();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("loadUsersBtn").addEventListener("click", async () => {
-    try {
-      await loadUsers();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("generateBloomBtn").addEventListener("click", async () => {
-    try {
-      await generateBloom();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("gradeBtn").addEventListener("click", async () => {
-    try {
-      await gradeOneAnswer();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("reloadTopicsBtn").addEventListener("click", async () => {
-    try {
-      await loadClassesAndTopics();
-    } catch (err) {
-      alert(err.message);
-    }
-  });
-
-  $("loadAssessmentsBtn").addEventListener("click", async () => {
-    try {
-      await loadAssessments();
+      alert("Profile saved.");
     } catch (err) {
       alert(err.message);
     }
   });
 
   try {
-    await loadClassesAndTopics();
+    await loadClasses();
+    await loadTopics();
+    if (state.token) {
+      await loadMe();
+      await refreshDashboards();
+    }
   } catch (err) {
     console.error(err);
   }
 
-  if (state.token) {
-    try {
-      await refreshMe();
-      if (state.me?.role === "admin") {
-        await loadUsers();
-        await loadAssessments();
-      }
-    } catch (err) {
-      localStorage.removeItem("babooda_token");
-      state.token = "";
-      setStatus("Login expired");
-    }
-  } else {
-    renderRoleUI();
+  adminUI();
+  userUI();
+  organizerUI();
+
+  if (!state.token) {
+    setStatus("Not logged in");
   }
 }
 
-wireUp();
+init();
