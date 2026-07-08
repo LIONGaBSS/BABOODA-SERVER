@@ -4,247 +4,181 @@ const client = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
-function pickTone(profile = {}) {
-  const level = String(profile.readingLevel || profile.classLevel || "").toLowerCase();
-  if (!level) return "simple";
-  if (["class 5", "class 6", "5", "6", "beginner"].includes(level)) return "very simple";
-  if (["class 7", "class 8", "intermediate"].includes(level)) return "simple";
-  return "balanced";
-}
-
-function extractJson(text) {
-  if (!text) return null;
-  const first = text.indexOf("{");
-  const last = text.lastIndexOf("}");
-  if (first === -1 || last === -1 || last <= first) return null;
-  try {
-    return JSON.parse(text.slice(first, last + 1));
-  } catch (err) {
-    return null;
-  }
-}
-
-function fallbackAnswer({ topic, question, mode, profile }) {
-  const classLevel = profile?.classLevel || "unknown";
-  const tone = pickTone(profile);
+function fallbackText(topic, mode) {
+  const base = topic?.content || topic?.aim || topic?.title || "This topic";
   return {
-    topicId: topic?.id || null,
-    mode,
-    book_answer: `Based on the syllabus material for "${topic?.title || "this topic"}", here is a grounded answer for ${classLevel}.`,
-    student_explanation: `In ${tone} language, the idea means: ${topic?.content?.slice(0, 280) || "study material is not available in text form yet."}`,
-    counter_arguments: [
-      "Different interpretations may exist depending on the book's context.",
-      "A stronger or weaker claim may need extra evidence from the source text."
-    ],
-    analogy: "Think of this idea like a guiding rule that helps organize the smaller parts of the topic.",
-    application: "Use this idea while reading, summarizing, and answering exam questions from the chapter.",
-    confidence: 55,
-    source_notes: [
-      "Fallback answer used because no OpenAI API key is configured."
-    ],
-    question_echo: question || ""
-  };
+    aim: `The aim of "${topic?.title || "this topic"}" is to understand the central idea using the study material first.`,
+    trunk: `The main trunk idea is: ${base.slice(0, 180)}.`,
+    test: `Counter-argument view: the topic may be interpreted differently depending on context, examples, or assumptions in the book.`,
+    own: `Practical analogy: think of this idea as a real-life framework that helps organize smaller details around one central principle.`,
+    reality: `How to use it: apply the idea while reading, summarizing, comparing examples, and solving exam questions.`,
+    general: `Based on the syllabus material, the key answer is: ${base.slice(0, 220)}.`
+  }[mode] || base;
 }
 
-async function askAI({ topic, question, mode = "general", profile = {}, contextText = "" }) {
+async function askAI({ topic, question, mode, profile, studyText }) {
   if (!client) {
-    return fallbackAnswer({ topic, question, mode, profile });
+    return {
+      mode,
+      book_answer: fallbackText(topic, mode),
+      personalized_answer: `For ${profile.classNo || "the class"} level, this can be explained simply: ${fallbackText(topic, mode)}`,
+      counter_arguments: ["Alternative interpretation may exist in a different context."],
+      analogy: "Use a familiar real-life example to connect the idea.",
+      application: "Use it in reading, revision, and written answers.",
+      confidence: 55,
+      source_notes: ["Fallback mode because OPENAI_API_KEY is not set."],
+      question
+    };
   }
 
-  const systemPrompt = `
-You are Babooda, a syllabus-grounded teaching assistant.
-Use the provided study material first.
-Do not invent facts beyond the material unless clearly marked as inference.
-Adapt the explanation to the user's profile:
-- Class: ${profile.classLevel || "unknown"}
-- Age: ${profile.age || "unknown"}
-- Bloom depth: ${profile.bloomLevel || "unknown"} (${profile.bloomScore || 0})
-- Reading level: ${profile.readingLevel || "unknown"}
-- Language: ${profile.language || "English"}
-- Preferred tone: ${profile.preferredTone || "simple"}
+  const system = `
+You are Babooda, a syllabus-grounded educational AI.
+Use study material first. Do not invent facts if the material is enough.
+Then adapt to the learner profile:
+- class: ${profile.classNo || ""}
+- age: ${profile.age || ""}
+- Bloom depth: ${profile.bloomScore || ""}
+- language: ${profile.language || "English"}
+- reading level: ${profile.readingLevel || ""}
 
-Return ONLY valid JSON with this schema:
+Return ONLY valid JSON with:
 {
-  "topicId": string|null,
-  "mode": string,
-  "book_answer": string,
-  "student_explanation": string,
-  "counter_arguments": [string],
-  "analogy": string,
-  "application": string,
-  "confidence": number,
-  "source_notes": [string]
+  "mode": "...",
+  "book_answer": "...",
+  "personalized_answer": "...",
+  "counter_arguments": ["..."],
+  "analogy": "...",
+  "application": "...",
+  "confidence": 0-100,
+  "source_notes": ["..."]
 }
 `;
 
-  const modeMap = {
-    aim: "Answer the aim/objective of the topic.",
-    main_idea: "Answer the main trunk / load-bearing idea of the topic.",
-    counter: "Explain counter-arguments or alternate interpretations from the material.",
-    analogy: "Give a practical analogy of the idea in the topic.",
-    application: "Explain how to use the idea learned from the topic.",
-    general: "Answer the user's question using the book material first."
-  };
-
-  const userPrompt = `
-Topic:
-Title: ${topic?.title || "Unknown"}
-Aim: ${topic?.aim || "Not given"}
-Class: ${topic?.classNo || "Unknown"}
-Subject: ${topic?.subject || "Unknown"}
-
-Mode instruction:
-${modeMap[mode] || modeMap.general}
-
+  const user = `
+Topic title: ${topic?.title || ""}
+Topic aim: ${topic?.aim || ""}
 Study material:
-${contextText || topic?.content || "No material text available."}
+${studyText || topic?.content || ""}
 
-User question:
-${question}
+Mode: ${mode}
+Question: ${question}
 `;
 
   const response = await client.responses.create({
     model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
     input: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
+      { role: "system", content: system },
+      { role: "user", content: user }
     ]
   });
 
-  const outputText = response.output_text || "";
-  const parsed = extractJson(outputText);
-
-  if (parsed) {
+  const text = response.output_text || "";
+  try {
+    return JSON.parse(text);
+  } catch {
     return {
-      topicId: parsed.topicId || topic?.id || null,
-      mode: parsed.mode || mode,
-      book_answer: parsed.book_answer || "",
-      student_explanation: parsed.student_explanation || "",
-      counter_arguments: Array.isArray(parsed.counter_arguments) ? parsed.counter_arguments : [],
-      analogy: parsed.analogy || "",
-      application: parsed.application || "",
-      confidence: Number(parsed.confidence || 0),
-      source_notes: Array.isArray(parsed.source_notes) ? parsed.source_notes : [],
-      question_echo: question
+      mode,
+      book_answer: text,
+      personalized_answer: "",
+      counter_arguments: [],
+      analogy: "",
+      application: "",
+      confidence: 0,
+      source_notes: ["Model returned non-JSON output."]
     };
   }
-
-  return {
-    topicId: topic?.id || null,
-    mode,
-    book_answer: outputText || "No answer returned.",
-    student_explanation: "",
-    counter_arguments: [],
-    analogy: "",
-    application: "",
-    confidence: 0,
-    source_notes: ["Model returned non-JSON output."],
-    question_echo: question
-  };
 }
 
-async function generateBloomQuestions({ topic, profile = {} }) {
+async function generateBloomQuestions({ topic, profile }) {
   if (!client) {
     return {
       questions: [
-        { bloomLevel: "Remember", question: `What is ${topic?.title || "the topic"}?` },
-        { bloomLevel: "Understand", question: `Explain ${topic?.title || "the topic"} in your own words.` },
-        { bloomLevel: "Apply", question: `How would you use ${topic?.title || "this idea"} in real life?` },
-        { bloomLevel: "Analyze", question: `What are the main parts or assumptions behind this topic?` },
-        { bloomLevel: "Evaluate", question: `Do you agree with the interpretation in the book? Why?` },
-        { bloomLevel: "Create", question: `Create a new example or solution using this topic.` }
-      ],
-      note: "Fallback generated because no OpenAI API key is configured."
+        { bloom: "Remember", question: `What is ${topic?.title || "this topic"}?` },
+        { bloom: "Understand", question: `Explain ${topic?.title || "this topic"} in your own words.` },
+        { bloom: "Apply", question: `How would you use this idea in a real-life example?` },
+        { bloom: "Analyze", question: `What are the major parts or assumptions of the topic?` },
+        { bloom: "Evaluate", question: `Do you agree with the interpretation in the book? Why?` },
+        { bloom: "Create", question: `Create a new example or solution using this idea.` }
+      ]
     };
   }
 
   const prompt = `
-Create 6 Bloom's Taxonomy questions for this topic.
-Return ONLY valid JSON in the form:
+Create 6 Bloom's Taxonomy questions in JSON:
 {
-  "questions": [
-    { "bloomLevel": "Remember", "question": "...", "hint": "..." },
-    { "bloomLevel": "Understand", "question": "...", "hint": "..." },
-    { "bloomLevel": "Apply", "question": "...", "hint": "..." },
-    { "bloomLevel": "Analyze", "question": "...", "hint": "..." },
-    { "bloomLevel": "Evaluate", "question": "...", "hint": "..." },
-    { "bloomLevel": "Create", "question": "...", "hint": "..." }
-  ]
+ "questions":[
+   {"bloom":"Remember","question":"..."},
+   {"bloom":"Understand","question":"..."},
+   {"bloom":"Apply","question":"..."},
+   {"bloom":"Analyze","question":"..."},
+   {"bloom":"Evaluate","question":"..."},
+   {"bloom":"Create","question":"..."}
+ ]
 }
 
-Topic:
-Title: ${topic?.title || "Unknown"}
-Aim: ${topic?.aim || "Not given"}
-Content: ${topic?.content || "No content"}
-
-Student profile:
-Class: ${profile.classLevel || "unknown"}
-Age: ${profile.age || "unknown"}
-Bloom score: ${profile.bloomScore || 0}
-Reading level: ${profile.readingLevel || "unknown"}
+Topic: ${topic?.title || ""}
+Aim: ${topic?.aim || ""}
+Content: ${topic?.content || ""}
+Learner class: ${profile.classNo || ""}
+Learner age: ${profile.age || ""}
 `;
-
   const response = await client.responses.create({
     model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
     input: [
-      { role: "system", content: "You generate educational assessment items." },
+      { role: "system", content: "You generate assessment questions." },
       { role: "user", content: prompt }
     ]
   });
 
-  const outputText = response.output_text || "";
-  const parsed = extractJson(outputText);
-  if (parsed?.questions) return parsed;
-
-  return {
-    questions: [],
-    raw: outputText
-  };
+  try {
+    return JSON.parse(response.output_text || "{}");
+  } catch {
+    return { questions: [] };
+  }
 }
 
-async function gradeAnswer({ question, answer, topic, profile = {} }) {
+async function gradeBloomAnswers({ topic, questions, answers, profile }) {
+  const qaPairs = (questions || []).map((q, i) => ({
+    question: q.question,
+    answer: answers?.[i] || ""
+  }));
+
   if (!client) {
-    const score = Math.min(100, Math.max(0, String(answer || "").length));
+    const lengths = qaPairs.map((x) => String(x.answer).length);
+    const score = Math.max(0, Math.min(100, Math.round(lengths.reduce((a, b) => a + b, 0) / 12)));
     return {
-      score: score > 100 ? 100 : score,
-      level:
-        score < 20 ? "Low" :
-        score < 50 ? "Developing" :
-        score < 75 ? "Proficient" : "Advanced",
-      feedback: "Fallback scoring used because no OpenAI API key is configured.",
-      strengths: ["Answer was received"],
-      gaps: ["Connect answer to the syllabus text more directly"],
-      nextSteps: ["Quote the key idea", "Add one example", "Mention the chapter's logic"]
+      topicScore: score,
+      perQuestionScores: qaPairs.map(() => score),
+      feedback: "Fallback grading used because OPENAI_API_KEY is not set.",
+      strengths: ["Answers were submitted"],
+      gaps: ["Add more detail from the study material"],
+      nextSteps: ["Use chapter keywords", "Write one example", "Mention the main idea"],
+      level: score < 30 ? "Low" : score < 60 ? "Developing" : score < 80 ? "Proficient" : "Advanced"
     };
   }
 
   const prompt = `
-Grade the student's answer using a 0-100 score, with feedback based on the study material first.
-Return ONLY valid JSON:
+Grade these Bloom answers from the study material first.
+Return JSON:
 {
-  "score": number,
-  "level": "Low|Developing|Proficient|Advanced",
-  "feedback": string,
-  "strengths": [string],
-  "gaps": [string],
-  "nextSteps": [string]
+ "topicScore": 0-100,
+ "perQuestionScores":[0-100,0-100,0-100,0-100,0-100,0-100],
+ "feedback":"...",
+ "strengths":["..."],
+ "gaps":["..."],
+ "nextSteps":["..."],
+ "level":"Low|Developing|Proficient|Advanced"
 }
 
-Topic:
-Title: ${topic?.title || "Unknown"}
-Aim: ${topic?.aim || "Not given"}
-Content: ${topic?.content || "No content"}
+Topic: ${topic?.title || ""}
+Aim: ${topic?.aim || ""}
+Content: ${topic?.content || ""}
 
-Question:
-${question}
+Questions & answers:
+${JSON.stringify(qaPairs, null, 2)}
 
-Student answer:
-${answer}
-
-Student profile:
-Class: ${profile.classLevel || "unknown"}
-Age: ${profile.age || "unknown"}
-Bloom score: ${profile.bloomScore || 0}
+Profile:
+${JSON.stringify(profile || {}, null, 2)}
 `;
 
   const response = await client.responses.create({
@@ -255,23 +189,23 @@ Bloom score: ${profile.bloomScore || 0}
     ]
   });
 
-  const outputText = response.output_text || "";
-  const parsed = extractJson(outputText);
-
-  if (parsed) return parsed;
-
-  return {
-    score: 0,
-    level: "Low",
-    feedback: outputText || "No grading output returned.",
-    strengths: [],
-    gaps: [],
-    nextSteps: []
-  };
+  try {
+    return JSON.parse(response.output_text || "{}");
+  } catch {
+    return {
+      topicScore: 0,
+      perQuestionScores: [],
+      feedback: "Non-JSON output",
+      strengths: [],
+      gaps: [],
+      nextSteps: [],
+      level: "Low"
+    };
+  }
 }
 
 module.exports = {
   askAI,
   generateBloomQuestions,
-  gradeAnswer
+  gradeBloomAnswers
 };
