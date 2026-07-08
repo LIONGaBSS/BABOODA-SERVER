@@ -1,15 +1,9 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const { findUserById } = require("./db");
 
 function signToken(user) {
   return jwt.sign(
-    {
-      sub: user.id,
-      role: user.role,
-      email: user.email,
-      name: user.name
-    },
+    { sub: user.id, role: user.role, organizationId: user.organizationId, name: user.name },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -27,32 +21,28 @@ async function comparePassword(password, hash) {
   return bcrypt.compare(password, hash);
 }
 
-function authMiddleware(req, res, next) {
+function authRequired(req, res, next) {
   const header = req.headers.authorization || "";
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-
-  if (!token) {
-    return res.status(401).json({ error: "Missing token" });
-  }
+  if (!token) return res.status(401).json({ error: "Missing token" });
 
   try {
     const payload = verifyToken(token);
-    const user = findUserById(payload.sub);
-    if (!user) return res.status(401).json({ error: "User not found" });
-
-    req.user = user;
-    req.tokenPayload = payload;
+    req.auth = payload;
     next();
-  } catch (err) {
-    return res.status(401).json({ error: "Invalid or expired token" });
+  } catch {
+    return res.status(401).json({ error: "Invalid token" });
   }
 }
 
-function adminOnly(req, res, next) {
-  if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin access required" });
-  }
-  next();
+function roleRequired(...roles) {
+  return (req, res, next) => {
+    if (!req.auth) return res.status(401).json({ error: "Unauthorized" });
+    if (!roles.includes(req.auth.role)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    next();
+  };
 }
 
 module.exports = {
@@ -60,6 +50,6 @@ module.exports = {
   verifyToken,
   hashPassword,
   comparePassword,
-  authMiddleware,
-  adminOnly
+  authRequired,
+  roleRequired
 };
