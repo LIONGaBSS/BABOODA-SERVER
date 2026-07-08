@@ -1,0 +1,5 @@
+{
+  "organizerIds": ["ORG-001", "ORG-002", "ORG-003", "ORG-004", "ORG-005"],
+  "adminIds": ["EMP-001", "EMP-002", "EMP-003", "EMP-004", "EMP-005"],
+  "studentIds": ["STD-001", "STD-002", "STD-003", "STD-004", "STD-005"]
+}
