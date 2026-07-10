@@ -1,7 +1,7 @@
 {
   "name": "babooda-server",
   "version": "1.0.0",
-  "description": "Babooda syllabus-grounded AI learning platform server",
+  "description": "Babooda syllabus-grounded AI learning platform",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
@@ -13,9 +13,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
     "openai": "^4.0.0"
   }
 }
